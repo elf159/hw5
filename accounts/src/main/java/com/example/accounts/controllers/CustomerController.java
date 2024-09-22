@@ -41,7 +41,7 @@ public class CustomerController {
 
     @Transactional
     @PostMapping("/transfers")
-    public ResponseEntity<?> transferMoney(@RequestBody TransferDTO transferDTO) {
-        return customerService.transfer(transferDTO);
+    public ResponseEntity<TransactionDTO> transferMoney(@RequestHeader(value = "Idempotency-Key") String idempotencyKey, @RequestBody TransferDTO transferDTO) {
+        return customerService.transfer(idempotencyKey,transferDTO);
     }
 }

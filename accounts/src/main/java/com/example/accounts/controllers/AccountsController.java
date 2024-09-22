@@ -1,9 +1,6 @@
 package com.example.accounts.controllers;
 
-import com.example.accounts.dto.AccountDTO;
-import com.example.accounts.dto.AccountNumberResponse;
-import com.example.accounts.dto.AmountDTO;
-import com.example.accounts.dto.CreateAccountResponse;
+import com.example.accounts.dto.*;
 import com.example.accounts.services.AccountsService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -29,7 +26,7 @@ public class AccountsController {
     }
 
     @PostMapping("/accounts/{accountNumber}/top-up")
-    public ResponseEntity<?> topUpAccount(@PathVariable(value = "accountNumber") Integer accNum, @RequestBody AmountDTO amountDTO) {
-        return accountsService.topUpAccount(accNum, amountDTO);
+    public ResponseEntity<TransactionDTO> topUpAccount(@RequestHeader(value = "Idempotency-Key") String idempotencyKey, @PathVariable(value = "accountNumber") Integer accNum, @RequestBody AmountDTO amountDTO) {
+        return accountsService.topUpAccount(idempotencyKey, accNum, amountDTO);
     }
 }

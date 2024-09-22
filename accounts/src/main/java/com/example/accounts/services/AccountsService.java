@@ -3,13 +3,10 @@ package com.example.accounts.services;
 import com.example.accounts.config.AccountsConfigEnv;
 import com.example.accounts.dto.*;
 import com.example.accounts.entities.Account;
-import com.example.accounts.entities.Message;
 import com.example.accounts.repositories.AccountsRepository;
-import com.example.accounts.repositories.OutboxMessageRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
@@ -19,16 +16,21 @@ import java.util.*;
 public class AccountsService {
     private final AccountsRepository accountsRepository;
     private final AccountsConfigEnv accountsConfigEnv;
-    private final SimpMessagingTemplate simpMessagingTemplate;
-    private final OutboxMessageRepository outboxMessageRepository;
 
+    private final OutBoxService outboxService;
+    private final RedisService redisService;
+    private final TransactionService transactionService;
+    private final SocketService socketService;
     @Autowired
     public AccountsService(AccountsRepository accountsRepository, AccountsConfigEnv accountsConfigEnv,
-                           SimpMessagingTemplate simpMessagingTemplate, OutboxMessageRepository outboxMessageRepository) {
+                           OutBoxService outboxService, RedisService redisService,
+                           TransactionService transactionService, SocketService socketService) {
         this.accountsRepository = accountsRepository;
         this.accountsConfigEnv = accountsConfigEnv;
-        this.simpMessagingTemplate = simpMessagingTemplate;
-        this.outboxMessageRepository = outboxMessageRepository;
+        this.outboxService = outboxService;
+        this.redisService = redisService;
+        this.transactionService = transactionService;
+        this.socketService = socketService;
     }
     int accountNumber = 1;
     private Integer createAccountNumber() {
@@ -54,12 +56,7 @@ public class AccountsService {
         createAccountResponse.setAccountNumber(account.getAccountNumber());
         accountsRepository.save(account);
 
-        AccountSocketDTO accountSocketDTO = new AccountSocketDTO();
-        accountSocketDTO.setAccountNumber(account.getAccountNumber());
-        accountSocketDTO.setCurrency(account.getCurrency());
-        accountSocketDTO.setBalance(account.getBalance());
-
-        simpMessagingTemplate.convertAndSend("/topic/accounts", accountSocketDTO);
+        socketService.send(account);
 
         return ResponseEntity.status(HttpStatus.OK).body(createAccountResponse);
     }
@@ -96,33 +93,42 @@ public class AccountsService {
     private boolean checkAccNum(Integer accNum) {
         return accNum == null || accNum.toString().isEmpty() || accNum == 0;
     }
-    public ResponseEntity<?> topUpAccount(Integer accNum, AmountDTO amountDTO) {
+    public ResponseEntity<TransactionDTO> topUpAccount(String key, Integer accNum, AmountDTO amountDTO) {
         if (checkAccNum(accNum)) {
             return ResponseEntity.badRequest().build();
         }
         if (amountDTO.getAmount().compareTo(BigDecimal.ZERO) <= 0) {
             return ResponseEntity.badRequest().build();
         }
-        return processTopUpAccount(accNum, amountDTO);
+        if (key != null) {
+            if (redisService.contain(key)) {
+                return ResponseEntity.ok(redisService.getCache(key));
+            }
+        }
+        return processTopUpAccount(key, accNum, amountDTO);
     }
 
-    private ResponseEntity<?> processTopUpAccount(Integer accNum, AmountDTO amountDTO) {
+    private ResponseEntity<TransactionDTO> processTopUpAccount(String key, Integer accNum, AmountDTO amountDTO) {
         Optional<Account> account = accountsRepository.findAccountByAccountNumber(accNum);
         if (account.isPresent()) {
             Account getAccount = account.get();
             getAccount.setBalance(getAccount.getBalance().add(amountDTO.getAmount()));
             accountsRepository.save(getAccount);
-            AccountSocketDTO accountSocketDTO = new AccountSocketDTO();
-            accountSocketDTO.setAccountNumber(getAccount.getAccountNumber());
-            accountSocketDTO.setCurrency(getAccount.getCurrency());
-            accountSocketDTO.setBalance(getAccount.getBalance());
-            simpMessagingTemplate.convertAndSend("/topic/accounts", accountSocketDTO);
-            Message message = new Message();
-            message.setAccountNumber(getAccount.getAccountNumber());
-            message.setAmount(amountDTO.getAmount());
-            message.setBalance(getAccount.getBalance());
-            outboxMessageRepository.save(message);
-            return ResponseEntity.ok().build();
+            socketService.send(getAccount);
+
+            outboxService.save(getAccount, amountDTO.getAmount());
+
+
+            TransactionDTO transaction = new TransactionDTO();
+            transaction.setTransactionId(String.valueOf(UUID.randomUUID()));
+            transaction.setAmount(amountDTO.getAmount());
+
+            if (key != null) {
+                redisService.saveCache(key, transaction);
+            }
+
+            transactionService.save(transaction, accNum, amountDTO.getAmount());
+            return ResponseEntity.ok(transaction);
         }
         return ResponseEntity.badRequest().build();
     }
