@@ -5,7 +5,7 @@
 replicaCount: 2
 
 image:
-  repository: agnusdecrucifixion/converter #поставь сюда свой образ
+  repository: elf159/converter #поставь сюда свой образ
   pullPolicy: IfNotPresent
   tag: latest
 
