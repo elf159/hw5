@@ -22,3 +22,14 @@ grpc:
       address: ${CONVERTER_URL}
       negotiation-type: plaintext
 
+
+resilience4j:
+  circuitbreaker:
+    instances:
+      converterBreaker:
+        minimum-number-of-calls: 10
+        automatic-transition-from-open-to-half-open-enabled: true
+        permitted-number-of-calls-in-half-open-state: 3
+        failure-rate-threshold: 50
+        wait-duration-in-open-state: 10
+

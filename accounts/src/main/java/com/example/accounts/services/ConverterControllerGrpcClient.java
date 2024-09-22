@@ -7,12 +7,10 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 
 import converter.ConverterServiceGrpc;
 import converter.Converter;
+import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
-import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
-
 import java.math.BigDecimal;
 
 @Service
@@ -23,6 +21,7 @@ public class ConverterControllerGrpcClient {
         this.converterServiceBlockingStub = converterServiceBlockingStub;
     }
 
+    @CircuitBreaker(name = "converterBreaker")
     converter.ConvertResponse convert(@RequestParam String from, @RequestParam String to, @RequestParam BigDecimal amount) {
         return converterServiceBlockingStub.convert(converter.ConvertRequest
                 .newBuilder()

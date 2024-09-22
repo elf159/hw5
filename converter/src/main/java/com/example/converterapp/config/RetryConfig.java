@@ -1,11 +1,9 @@
 package com.example.converterapp.config;
 
-import lombok.Getter;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.retry.annotation.EnableRetry;
 
 @Configuration
-@Getter
-public class KeycloakConfig {
-
-
+@EnableRetry
+public class RetryConfig {
 }
