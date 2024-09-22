@@ -63,7 +63,7 @@ jobs:
 
   autotest:
     needs: build
-    uses: central-university-dev/hse-ab-cicd-hw/.github/workflows/autotests-hw5.yml@main
+    uses: evevseev/the-bank-tests/.github/workflows/autotests-hw5.yml@main
     with:
       chart-path: ./converter/random
       converter-image-name: elf159/converter
