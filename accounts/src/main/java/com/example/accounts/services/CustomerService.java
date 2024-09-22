@@ -4,16 +4,13 @@ import com.example.accounts.config.AccountsConfigEnv;
 import com.example.accounts.dto.*;
 import com.example.accounts.entities.Account;
 import com.example.accounts.entities.Customer;
-import com.example.accounts.entities.Message;
 import com.example.accounts.exceptions.GRPCProcessException;
 import com.example.accounts.repositories.AccountsRepository;
 import com.example.accounts.repositories.CustomerRepository;
-import com.example.accounts.repositories.OutboxMessageRepository;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.*;
 import org.springframework.http.converter.FormHttpMessageConverter;
-import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 
@@ -30,25 +27,28 @@ public class CustomerService {
     private final AccountsRepository accountsRepository;
     private final AccountsConfigEnv accountsConfigEnv;
     private final RestTemplate restTemplate;
-    private final SimpMessagingTemplate simpMessagingTemplate;
     private final ConverterControllerGrpcClient client;
-    private final OutboxMessageRepository outboxMessageRepository;
-
+    private final OutBoxService outboxService;
+    private final RedisService redisService;
+    private final TransactionService transactionService;
+    private final SocketService socketService;
 
     @Autowired
     public CustomerService(CustomerRepository customerRepository, AccountsRepository accountsRepository,
                            AccountsConfigEnv accountsConfigEnv,
-                           RestTemplate restTemplate, SimpMessagingTemplate simpMessagingTemplate,
-                           ConverterControllerGrpcClient client, OutboxMessageRepository outboxMessageRepository) {
+                           RestTemplate restTemplate, SocketService socketService,
+                           ConverterControllerGrpcClient client, OutBoxService outboxService,
+                           RedisService redisService, TransactionService transactionService) {
         this.customerRepository = customerRepository;
         this.accountsRepository = accountsRepository;
         this.accountsConfigEnv = accountsConfigEnv;
         this.restTemplate = restTemplate;
-        this.outboxMessageRepository = outboxMessageRepository;
         this.restTemplate.getMessageConverters().add(new FormHttpMessageConverter());
-        this.simpMessagingTemplate = simpMessagingTemplate;
         this.client = client;
-
+        this.outboxService = outboxService;
+        this.redisService = redisService;
+        this.transactionService = transactionService;
+        this.socketService = socketService;
     }
     private static final Pattern pattern = Pattern.compile("\\d{4}-\\d{2}-\\d{2}");
 
@@ -122,12 +122,17 @@ public class CustomerService {
         return BigDecimal.valueOf(response.getAmount());
     }
 
-    public ResponseEntity<?> transfer(TransferDTO transferDTO) {
+    public ResponseEntity<TransactionDTO> transfer(String key, TransferDTO transferDTO) {
         if (!checkDTO(transferDTO)) {
             return ResponseEntity.badRequest().build();
         }
         int senderFromDTO = parseAccountNumber(String.valueOf(transferDTO.getSenderAccount()));
         int receiverFromDTO = parseAccountNumber(String.valueOf(transferDTO.getReceiverAccount()));
+        if (key != null) {
+            if (redisService.contain(key)) {
+                return ResponseEntity.ok(redisService.getCache(key));
+            }
+        }
         BigDecimal amount = transferDTO.getAmountInSenderCurrency();
         Optional<Account> optSender = findAccountByAccountNumber(senderFromDTO);
         Optional<Account> optReceiver = findAccountByAccountNumber(receiverFromDTO);
@@ -136,8 +141,18 @@ public class CustomerService {
         }
         Account sender = optSender.get();
         Account receiver = optReceiver.get();
-        transferMoney(sender, receiver, amount);
-        return ResponseEntity.ok().build();
+
+        TransactionDTO transaction = transferMoney(sender, receiver, amount);
+        transaction.setTransactionId(String.valueOf(UUID.randomUUID()));
+        transaction.setAmount(amount);
+        if (key != null) {
+            redisService.saveCache(key, transaction);
+            transaction.setTransactionId(key);
+        }
+
+        transactionService.save(transaction, senderFromDTO, amount);
+
+        return ResponseEntity.ok(transaction);
     }
 
     private boolean checkDTO(TransferDTO transferDTO) {
@@ -163,37 +178,24 @@ public class CustomerService {
         return accountsRepository.findAccountByAccountNumber(accountNumber);
     }
 
-    private void transferMoney(Account sender, Account receiver, BigDecimal amount) {
+    private TransactionDTO transferMoney(Account sender, Account receiver, BigDecimal amount) {
         BigDecimal convAmount = convert(sender.getCurrency(), receiver.getCurrency(), amount);
         receiver.setBalance(receiver.getBalance().add(convAmount));
         sender.setBalance(sender.getBalance().subtract(amount));
         accountsRepository.save(sender);
         accountsRepository.save(receiver);
-        AccountSocketDTO senderSocketDto = new AccountSocketDTO();
-        senderSocketDto.setAccountNumber(sender.getAccountNumber());
-        senderSocketDto.setCurrency(sender.getCurrency());
-        senderSocketDto.setBalance(sender.getBalance());
 
-        AccountSocketDTO receiverSocketDto = new AccountSocketDTO();
-        receiverSocketDto.setAccountNumber(receiver.getAccountNumber());
-        receiverSocketDto.setBalance(receiver.getBalance());
-        receiverSocketDto.setCurrency(receiver.getCurrency());
+        socketService.send(sender);
 
-        simpMessagingTemplate.convertAndSend("/topic/accounts", senderSocketDto);
-        simpMessagingTemplate.convertAndSend("/topic/accounts", receiverSocketDto);
+        socketService.send(receiver);
 
-        Message messageSender = new Message();
-        messageSender.setAccountNumber(sender.getAccountNumber());
-        messageSender.setAmount(amount);
-        messageSender.setBalance(sender.getBalance());
-        outboxMessageRepository.save(messageSender);
 
-        Message messageReceiver = new Message();
-        messageReceiver.setAccountNumber(receiver.getAccountNumber());
-        messageReceiver.setAmount(amount);
-        messageReceiver.setBalance(receiver.getBalance());
-        outboxMessageRepository.save(messageReceiver);
+        outboxService.save(sender, amount);
+        outboxService.save(receiver, amount);
 
+        TransactionDTO transaction = new TransactionDTO();
+        transaction.setAmount(amount);
+        return transaction;
     }
     private static boolean checkNumber(String str) {
         return str.matches("[1-9][0-9]*");
