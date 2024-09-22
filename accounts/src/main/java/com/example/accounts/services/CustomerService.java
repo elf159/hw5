@@ -4,9 +4,11 @@ import com.example.accounts.config.AccountsConfigEnv;
 import com.example.accounts.dto.*;
 import com.example.accounts.entities.Account;
 import com.example.accounts.entities.Customer;
+import com.example.accounts.entities.Message;
 import com.example.accounts.exceptions.GRPCProcessException;
 import com.example.accounts.repositories.AccountsRepository;
 import com.example.accounts.repositories.CustomerRepository;
+import com.example.accounts.repositories.OutboxMessageRepository;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.*;
@@ -30,16 +32,19 @@ public class CustomerService {
     private final RestTemplate restTemplate;
     private final SimpMessagingTemplate simpMessagingTemplate;
     private final ConverterControllerGrpcClient client;
+    private final OutboxMessageRepository outboxMessageRepository;
+
 
     @Autowired
     public CustomerService(CustomerRepository customerRepository, AccountsRepository accountsRepository,
                            AccountsConfigEnv accountsConfigEnv,
                            RestTemplate restTemplate, SimpMessagingTemplate simpMessagingTemplate,
-                           ConverterControllerGrpcClient client) {
+                           ConverterControllerGrpcClient client, OutboxMessageRepository outboxMessageRepository) {
         this.customerRepository = customerRepository;
         this.accountsRepository = accountsRepository;
         this.accountsConfigEnv = accountsConfigEnv;
         this.restTemplate = restTemplate;
+        this.outboxMessageRepository = outboxMessageRepository;
         this.restTemplate.getMessageConverters().add(new FormHttpMessageConverter());
         this.simpMessagingTemplate = simpMessagingTemplate;
         this.client = client;
@@ -176,6 +181,18 @@ public class CustomerService {
 
         simpMessagingTemplate.convertAndSend("/topic/accounts", senderSocketDto);
         simpMessagingTemplate.convertAndSend("/topic/accounts", receiverSocketDto);
+
+        Message messageSender = new Message();
+        messageSender.setAccountNumber(sender.getAccountNumber());
+        messageSender.setAmount(amount);
+        messageSender.setBalance(sender.getBalance());
+        outboxMessageRepository.save(messageSender);
+
+        Message messageReceiver = new Message();
+        messageReceiver.setAccountNumber(receiver.getAccountNumber());
+        messageReceiver.setAmount(amount);
+        messageReceiver.setBalance(receiver.getBalance());
+        outboxMessageRepository.save(messageReceiver);
 
     }
     private static boolean checkNumber(String str) {

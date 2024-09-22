@@ -4,7 +4,7 @@ name: CI
 on:
   pull_request:
     branches:
-      - 'hw5'
+      - 'hw6'
     
   workflow_dispatch:
 jobs:
@@ -63,7 +63,7 @@ jobs:
 
   autotest:
     needs: build
-    uses: evevseev/the-bank-tests/.github/workflows/autotests-hw6.yml@main
+    uses: evevseev/the-bank-tests/.github/workflows/autotests-hw7.yml@main
     with:
       chart-path: ./converter/random
       converter-image-name: elf159/converter

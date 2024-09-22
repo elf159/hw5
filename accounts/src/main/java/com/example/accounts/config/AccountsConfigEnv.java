@@ -21,4 +21,6 @@ public class AccountsConfigEnv {
     String client_id;
     @Value("${CLIENT_SECRET}")
     String client_secret;
+    @Value("${NOTIFICATION_SERVICE_URL}")
+    String NOTIFICATION_SERVICE_URL;
 }

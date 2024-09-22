@@ -3,7 +3,7 @@ package com.example.converterapp.services;
 import com.example.converterapp.config.ConverterConfigEnv;
 import com.example.converterapp.dto.ConvertResponse;
 
-import generated.RatesResposne;
+import com.example.converterapp.generated.RatesResposne;
 import io.grpc.stub.StreamObserver;
 import net.devh.boot.grpc.server.service.GrpcService;
 import converter.ConverterServiceGrpc;
@@ -14,7 +14,7 @@ import org.springframework.web.client.RestTemplate;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 
-import generated.Currency;
+import com.example.converterapp.generated.Currency;
 
 @GrpcService
 public class ConverterServiceGrpcServer extends ConverterServiceGrpc.ConverterServiceImplBase {

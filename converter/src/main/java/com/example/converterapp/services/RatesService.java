@@ -3,7 +3,7 @@ package com.example.converterapp.services;
 import com.example.converterapp.config.ConverterConfigEnv;
 import com.example.converterapp.dto.RequestTokenAnswer;
 import com.example.converterapp.exception.RatesException;
-import generated.RatesResposne;
+import com.example.converterapp.generated.RatesResposne;
 import org.springframework.http.*;
 import org.springframework.retry.annotation.Backoff;
 import org.springframework.retry.annotation.Retryable;
