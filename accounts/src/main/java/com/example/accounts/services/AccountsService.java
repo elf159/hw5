@@ -3,7 +3,9 @@ package com.example.accounts.services;
 import com.example.accounts.config.AccountsConfigEnv;
 import com.example.accounts.dto.*;
 import com.example.accounts.entities.Account;
+import com.example.accounts.entities.Message;
 import com.example.accounts.repositories.AccountsRepository;
+import com.example.accounts.repositories.OutboxMessageRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -18,12 +20,15 @@ public class AccountsService {
     private final AccountsRepository accountsRepository;
     private final AccountsConfigEnv accountsConfigEnv;
     private final SimpMessagingTemplate simpMessagingTemplate;
+    private final OutboxMessageRepository outboxMessageRepository;
+
     @Autowired
     public AccountsService(AccountsRepository accountsRepository, AccountsConfigEnv accountsConfigEnv,
-                           SimpMessagingTemplate simpMessagingTemplate) {
+                           SimpMessagingTemplate simpMessagingTemplate, OutboxMessageRepository outboxMessageRepository) {
         this.accountsRepository = accountsRepository;
         this.accountsConfigEnv = accountsConfigEnv;
         this.simpMessagingTemplate = simpMessagingTemplate;
+        this.outboxMessageRepository = outboxMessageRepository;
     }
     int accountNumber = 1;
     private Integer createAccountNumber() {
@@ -112,6 +117,11 @@ public class AccountsService {
             accountSocketDTO.setCurrency(getAccount.getCurrency());
             accountSocketDTO.setBalance(getAccount.getBalance());
             simpMessagingTemplate.convertAndSend("/topic/accounts", accountSocketDTO);
+            Message message = new Message();
+            message.setAccountNumber(getAccount.getAccountNumber());
+            message.setAmount(amountDTO.getAmount());
+            message.setBalance(getAccount.getBalance());
+            outboxMessageRepository.save(message);
             return ResponseEntity.ok().build();
         }
         return ResponseEntity.badRequest().build();

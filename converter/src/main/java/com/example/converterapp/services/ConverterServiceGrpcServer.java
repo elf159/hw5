@@ -14,7 +14,7 @@ import org.springframework.web.client.RestTemplate;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 
-import generated.Currency;
+import com.example.converterapp.generated.Currency;
 
 @GrpcService
 public class ConverterServiceGrpcServer extends ConverterServiceGrpc.ConverterServiceImplBase {
