@@ -5,24 +5,7 @@ on:
   pull_request:
     branches:
       - 'main'
-  workflow_call:
-    inputs:
-      chart-path:
-        required: true
-        type: string
-      converter-image-name:
-        required: true
-        type: string
-      accounts-image-name:
-        required: true
-        type: string
-      image-tag:
-        required: true
-        type: string
-    secrets:
-      HSE_LOKI_TOKEN:
-        required: true
-    workflow_dispatch:
+  workflow_dispatch:
 jobs:
   build:
     runs-on: ubuntu-latest
