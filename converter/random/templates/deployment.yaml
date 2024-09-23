@@ -1,0 +1,30 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Values.fullnameOverride }}
+  labels:
+    app: {{ .Values.fullnameOverride }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      app: {{ .Values.fullnameOverride }}
+  template:
+    metadata:
+      labels:
+        app: {{ .Values.fullnameOverride }}
+    spec:
+      containers:
+        - name: converter
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          env:
+          {{- range $.Values.extraEnv }}
+          - name: {{ .name | quote  }}
+            value: {{ .value | quote }}
+          {{- end }}
+          ports:
+            - containerPort: {{ .Values.service.port }}
+          livenessProbe:
+            {{- toYaml .Values.livenessProbe | nindent 12 }}
+          readinessProbe:
+            {{- toYaml .Values.readinessProbe | nindent 12 }}

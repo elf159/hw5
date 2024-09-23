@@ -1,0 +1,44 @@
+openapi: 3.0.0
+info:
+  title: Sample API
+  description: Valuable description
+  version: 0.1.9
+servers:
+  - url: https://example.org/
+    description: Optional server description, e.g. Main (production) server
+paths:
+  /rates:
+    get:
+      summary: Returns rates.
+      description: Optional extended description in CommonMark or HTML.
+      responses:
+        '200':    # status code
+          description: A JSON array of user names
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RatesResposne'
+
+
+components:
+  schemas:
+    RatesResposne:
+      type: object
+      properties:
+        base:
+          $ref: '#/components/schemas/Currency'
+        rates:
+          type: object
+          additionalProperties:
+            type: number
+          example:
+            USD: 91.42
+            RUB: 1
+    Currency:
+      type: string
+      enum:
+        - "RUB"
+        - "CNY"
+        - "EUR"
+        - "USD"
+        - "GBP"
